@@ -16,6 +16,9 @@ import {GridModel, KeyboardMonitor} from "./util";
 Rect.prototype.position = function() {
     return new Point(this.x,this.y)
 }
+Rect.prototype.center = function() {
+    return new Point(this.x+this.w/2,this.y+this.h/2)
+}
 
 Rect.prototype.add_position = function(pt:Point) {
     this.x += pt.x
@@ -42,6 +45,10 @@ Point.prototype.divide = function(val:number) {
 // @ts-ignore
 Point.prototype.scale = function(val:number) {
     return new Point(this.x*val, this.y*val)
+}
+// @ts-ignore
+Point.prototype.unit = function() {
+    return this.divide(this.magnitude())
 }
 
 /*
@@ -71,7 +78,7 @@ class Pet {
         this.name = "bob"
         this.kind = "cat"
         this.level = "normal"
-        this.run_speed = 5
+        this.run_speed = 2
         this.eat_speed = 10
         this.color = "green"
         this.bounds = new Rect(0,0,TS,TS)
@@ -163,7 +170,7 @@ class PetView extends BaseView {
                 color = 'red'
             }
             if(pet.state === 'moving') {
-                color = 'yellow'
+                color = '#44cc44'
             }
             if(pet.state === "sitting") {
                 color = 'goldenrod'
@@ -182,12 +189,20 @@ class PetView extends BaseView {
 class ClickView extends BaseView {
     private board: GridModel;
     private pets: Pet[];
-    constructor(board: GridModel, pets: Pet[]) {
+    private coins: Coins[];
+
+    constructor(board: GridModel, pets: Pet[], coins: Coins[]) {
         super("click-view");
         this.board = board
         this.pets = pets
+        this.coins = coins
     }
     draw(g: SurfaceContext): void {
+        this.coins.forEach(coin => {
+            if(coin.alive) {
+                g.fill(coin.bounds, 'black')
+            }
+        })
     }
 
     layout(g: SurfaceContext, available: Size): Size {
@@ -197,12 +212,9 @@ class ClickView extends BaseView {
 
     override input(event: CoolEvent) {
         if(event.type === POINTER_DOWN) {
-            let pt = (event as PointerEvent).position.divide_floor(TS)
-            let obj = this.board.get_at(pt)
-            if(obj instanceof Coins) {
-                let coins:Coins = obj as Coins
-                coins.bounds.x = pt.x * TS
-                coins.bounds.y = pt.y * TS
+            let pt = (event as PointerEvent).position
+            let coins = this.coins.find(c => c.bounds.contains(pt))
+            if(coins) {
                 this.pets.forEach((pet:Pet) => {
                     pet.target = coins
                 })
@@ -219,7 +231,6 @@ function init_board(board: GridModel) {
     board.fill_row(19, ()=> WALL)
     board.fill_col(0,()=>WALL)
     board.fill_col(19, () => WALL)
-    board.set_xy(10,5, new Coins(1000))
 }
 
 export function start() {
@@ -227,8 +238,6 @@ export function start() {
     let root = new LayerView()
     let board = new GridModel(new Size(20,20))
     init_board(board)
-    let board_view = new BoardView(board)
-    root.add(board_view)
 
     let player = new Player()
     player.bounds.x = 50
@@ -247,7 +256,15 @@ export function start() {
     let pet_view = new PetView(pets)
     root.add(pet_view)
 
-    let click_view = new ClickView(board,pets)
+    let coins:Coins[] = []
+    for(let i=0; i<5; i++) {
+        let coin = new Coins(randi(10,100))
+        coin.bounds.x = randi(0,400)
+        coin.bounds.y = randi(0,400)
+        coins.push(coin)
+    }
+
+    let click_view = new ClickView(board,pets,coins)
     root.add(click_view)
 
     surface.addToPage();
@@ -276,7 +293,7 @@ export function start() {
         if(kbd.is_down('ArrowDown'))  off.y = +1
 
         let pos = new Point(player.bounds.x, player.bounds.y)
-        let new_pos = pos.add(off)
+        let new_pos = pos.add(off.scale(5))
         let new_cell = new_pos.divide_floor(TS)
         let spot = board.get_at(new_cell)
         if(spot === GROUND) {
@@ -293,13 +310,8 @@ export function start() {
                     pet.state = 'sitting'
                 } else {
                     pet.state = 'moving'
-                    let pet_pos = pet.bounds.position()
-                    let pla_pos = player.bounds.position()
-                    let diff = pla_pos.subtract(pet_pos)
-                    let len = diff.magnitude()
-                    let unit = diff.divide(len)
-                    unit = unit.scale(0.5)
-                    pet.bounds.add_position(unit)
+                    let diff = player.bounds.center().subtract(pet.bounds.center())
+                    pet.bounds.add_position(diff.unit().scale(pet.run_speed))
                 }
             }
             if(pet.target !== null) {
@@ -307,17 +319,15 @@ export function start() {
                 // if pet overlaps the target
                 if(target.bounds.intersects(pet.bounds)) {
                     pet.state = 'eating'
-                    target.count -= 10
+                    target.count -= pet.eat_speed
                     if(target.count < 0) {
-                        console.log("done")
                         target.alive = false
+                        pet.target = null
                     }
                 } else {
-                    let diff = target.bounds.position().subtract(pet.bounds.position())
-                    let off = diff.divide(diff.magnitude())
-                    // let off = dir(pet.position, new Point(target.bounds.x, target.bounds.y))
-                    // pet.position = pet.position.subtract(off)
-                    pet.bounds.add_position(off)
+                    let diff = target.bounds.center().subtract(pet.bounds.center())
+                    let off = diff.unit()
+                    pet.bounds.add_position(off.scale(pet.run_speed))
                     pet.state = 'moving'
                 }
             }
