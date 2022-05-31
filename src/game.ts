@@ -1,3 +1,52 @@
+/*
+
+board should be a list of rects
+walls and outer bounds. player must be inside outer bounds and not inside walls
+
+board view draws the board rects
+items view draws the items
+pets view draws the pets
+player view draws the player
+
+if arrow keys
+    calculate new position for player
+    if new position inside outer bounds
+        if new position not intersects walls
+            move player to new position
+
+items is a list of rects
+if click on coin item
+    set pets.target to coin
+
+
+if pet.intersects(pet.target)
+    if coin and
+        go to eating state
+        decrease coin
+        increase score
+        if !coin.alive
+            delete coin
+            pet.target = player
+    if player
+        go to sitting state
+else
+    diff = pet.bounds.center.subtract(pet.target.bounds.center).unit().scale(pet.run_speed)
+    pet.bounds.add(diff)
+
+
+if player intersects egg item
+    show button to buy egg
+    egg gives you random new pet
+    egg uses up coins
+
+score view shows
+    current coin count
+    current pet count
+
+
+
+ */
+
 import {
     BaseView,
     CanvasSurface,
