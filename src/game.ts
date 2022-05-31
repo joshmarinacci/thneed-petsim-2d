@@ -102,6 +102,16 @@ class Pet {
     }
 }
 
+class Egg {
+    kind:string
+    level:PetLevel
+    bounds:Rect
+    constructor() {
+        this.kind = "cat"
+        this.level = "normal"
+        this.bounds = new Rect(0,0,10,10)
+    }
+}
 class Coins {
     alive: boolean;
     constructor(number: number) {
@@ -130,6 +140,7 @@ type GameState = {
     edge:Rect,
     walls:Rect[],
     pets:Pet[],
+    eggs:Egg[],
 }
 
 class BoardView extends BaseView {
@@ -146,6 +157,7 @@ class BoardView extends BaseView {
         this.state.walls.forEach(wall => {
             g.fill(wall,'darkgreen')
         })
+        this.state.eggs.forEach(egg => g.fill(egg.bounds, 'white'))
     }
 
     layout(g: SurfaceContext, available: Size): Size {
@@ -250,7 +262,8 @@ export function start() {
             new Rect(400,240,50,50),
         ],
         pets:[],
-        coins:[]
+        coins:[],
+        eggs:[]
     }
 
     for(let i=0;i<1; i++) {
@@ -267,6 +280,12 @@ export function start() {
         coin.bounds.y = randi(0,400)
         state.coins.push(coin)
     }
+
+    let cat_egg = new Egg()
+    cat_egg.kind = 'cat'
+    cat_egg.bounds = new Rect(200,200,30,30)
+    state.eggs.push(cat_egg)
+
 
 
     let board_view = new BoardView(state)
@@ -302,7 +321,7 @@ export function start() {
     let kbd = new KeyboardMonitor()
     kbd.monitor(surface)
 
-    function update() {
+    function update_player() {
         let off = new Point(0,0)
         if(kbd.is_down('ArrowLeft'))  off.x = -1
         if(kbd.is_down('ArrowRight')) off.x = +1
@@ -313,9 +332,19 @@ export function start() {
         bounds.add_position(off.scale(5))
 
         let hit = state.walls.find(wall =>wall.intersects(bounds))
+        if(hit) return
         let inside = state.edge.contains_rect(bounds)
-        if(!hit && inside) player.bounds = bounds
+        if(!inside) return
+        player.bounds = bounds
 
+        state.eggs.forEach(egg => {
+            if(player.bounds.intersects(egg.bounds)) {
+                console.log("over an egg")
+            }
+        })
+    }
+
+    function update_pets() {
         state.pets.forEach((pet:Pet) => {
             if(pet.target === null) {
                 if(player.bounds.intersects(pet.bounds)) {
@@ -344,6 +373,11 @@ export function start() {
                 }
             }
         })
+    }
+
+    function update() {
+        update_player()
+        update_pets()
     }
     function refresh() {
         update()
