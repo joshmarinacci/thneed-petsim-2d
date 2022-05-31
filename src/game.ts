@@ -42,9 +42,6 @@ if player intersects egg item
 score view shows
     current coin count
     current pet count
-
-
-
  */
 
 import {
@@ -61,44 +58,6 @@ import {
 } from "thneed-gfx";
 import {GridModel, KeyboardMonitor} from "./util";
 
-// @ts-ignore
-Rect.prototype.position = function() {
-    return new Point(this.x,this.y)
-}
-Rect.prototype.center = function() {
-    return new Point(this.x+this.w/2,this.y+this.h/2)
-}
-
-Rect.prototype.add_position = function(pt:Point) {
-    this.x += pt.x
-    this.y += pt.y
-}
-
-// @ts-ignore
-Rect.prototype.intersects = function(rect:Rect) {
-    if(this.contains(new Point(rect.x,rect.y))) return true
-    if(this.contains(new Point(rect.x,rect.y+rect.h))) return true
-    if(this.contains(new Point(rect.x+rect.w,rect.y))) return true
-    if(this.contains(new Point(rect.x+rect.w,rect.y+rect.h))) return true
-    return false
-}
-
-// @ts-ignore
-Point.prototype.magnitude = function() {
-    return Math.sqrt(this.x*this.x + this.y*this.y)
-}
-// @ts-ignore
-Point.prototype.divide = function(val:number) {
-    return new Point(this.x/val, this.y/val)
-}
-// @ts-ignore
-Point.prototype.scale = function(val:number) {
-    return new Point(this.x*val, this.y*val)
-}
-// @ts-ignore
-Point.prototype.unit = function() {
-    return this.divide(this.magnitude())
-}
 
 /*
 - [ ] Pet. Name. Kind. Gold rainbow dark level. Eat per second
@@ -107,6 +66,14 @@ Point.prototype.unit = function() {
 - [ ] Click to target pets
 - [ ] Egg spot to hatch new pets
  */
+
+Rect.prototype.contains_rect = function(rect:Rect):boolean {
+    if(!this.contains(new Point(rect.x,rect.y))) return false
+    if(!this.contains(new Point(rect.x,rect.y+rect.h))) return false
+    if(!this.contains(new Point(rect.x+rect.w,rect.y))) return false
+    if(!this.contains(new Point(rect.x+rect.w,rect.y+rect.h))) return false
+    return true
+}
 
 type PetLevel = "normal" | "gold" | "rainbow" |"darkmatter"
 type PetState = "sitting" | "eating" | "moving"
@@ -158,26 +125,26 @@ class Player {
     }
 }
 
+type GameState = {
+    coins: Coins[];
+    edge:Rect,
+    walls:Rect[],
+    pets:Pet[],
+}
+
 class BoardView extends BaseView {
     private board: GridModel;
+    private state: GameState;
 
-    constructor(board: GridModel) {
+    constructor(state:GameState) {
         super('board-view')
-        this.board = board
+        this.state = state
     }
 
     draw(g: SurfaceContext): void {
-        g.fillBackgroundSize(this.size(),'purple')
-        let ctx = (g as CanvasSurface).ctx
-        this.board.forEach((w,x,y)=>{
-            let color = 'gray'
-            if(w === GROUND) color = 'gray'
-            if(w === WALL) color = 'green'
-            if(w instanceof Coins) {
-                color = '#f0f0f0'
-            }
-            ctx.fillStyle = color
-            ctx.fillRect(x*TS,y*TS,TS,TS)
+        g.fill(this.state.edge,'gray')
+        this.state.walls.forEach(wall => {
+            g.fill(wall,'darkgreen')
         })
     }
 
@@ -205,24 +172,24 @@ class PlayerView extends BaseView {
 }
 
 class PetView extends BaseView {
-    private pets: Pet[];
-    constructor(pets: Pet[]) {
+    private state: GameState;
+
+    constructor(state: GameState) {
         super("pets");
-        this.pets = pets
+        this.state = state
     }
     draw(g: SurfaceContext): void {
-        // g.fillBackgroundSize(this.size(),'green')
-        this.pets.forEach(pet => {
+        this.state.pets.forEach(pet => {
             let rect = pet.bounds
             let color = pet.color
             if(pet.state === 'eating') {
-                color = 'red'
+                color = '#d20e71'
             }
             if(pet.state === 'moving') {
-                color = '#44cc44'
+                color = '#e948fd'
             }
             if(pet.state === "sitting") {
-                color = 'goldenrod'
+                color = '#bc23c7'
             }
             g.fill(rect,color)
         })
@@ -236,20 +203,17 @@ class PetView extends BaseView {
 }
 
 class ClickView extends BaseView {
-    private board: GridModel;
-    private pets: Pet[];
-    private coins: Coins[];
+    private state: GameState;
 
-    constructor(board: GridModel, pets: Pet[], coins: Coins[]) {
+
+    constructor(state:GameState) {
         super("click-view");
-        this.board = board
-        this.pets = pets
-        this.coins = coins
+        this.state = state
     }
     draw(g: SurfaceContext): void {
-        this.coins.forEach(coin => {
+        this.state.coins.forEach(coin => {
             if(coin.alive) {
-                g.fill(coin.bounds, 'black')
+                g.fill(coin.bounds, '#ffdd35')
             }
         })
     }
@@ -262,9 +226,9 @@ class ClickView extends BaseView {
     override input(event: CoolEvent) {
         if(event.type === POINTER_DOWN) {
             let pt = (event as PointerEvent).position
-            let coins = this.coins.find(c => c.bounds.contains(pt))
+            let coins = this.state.coins.find(c => c.bounds.contains(pt))
             if(coins) {
-                this.pets.forEach((pet:Pet) => {
+                this.state.pets.forEach((pet:Pet) => {
                     pet.target = coins
                 })
             }
@@ -272,21 +236,41 @@ class ClickView extends BaseView {
     }
 
 }
-const GROUND = 1
-const WALL = 2
-function init_board(board: GridModel) {
-    board.fill_all(()=>GROUND)
-    board.fill_row(0, ()=> WALL)
-    board.fill_row(19, ()=> WALL)
-    board.fill_col(0,()=>WALL)
-    board.fill_col(19, () => WALL)
-}
 
 export function start() {
     let surface = new CanvasSurface(640, 480);
     let root = new LayerView()
-    let board = new GridModel(new Size(20,20))
-    init_board(board)
+
+
+    let state:GameState = {
+        edge: new Rect(0,0,600,400),
+        walls: [
+            new Rect(-100,-50,200,100),
+            new Rect(200,50,50,50),
+            new Rect(400,240,50,50),
+        ],
+        pets:[],
+        coins:[]
+    }
+
+    for(let i=0;i<1; i++) {
+        let pet = new Pet()
+        pet.bounds.x = randi(0,200)
+        pet.bounds.y = randi(0,200)
+        pet.color = 'yellow'
+        state.pets.push(pet)
+    }
+
+    for(let i=0; i<5; i++) {
+        let coin = new Coins(randi(10,100))
+        coin.bounds.x = randi(0,400)
+        coin.bounds.y = randi(0,400)
+        state.coins.push(coin)
+    }
+
+
+    let board_view = new BoardView(state)
+    root.add(board_view)
 
     let player = new Player()
     player.bounds.x = 50
@@ -294,26 +278,10 @@ export function start() {
     let player_view = new PlayerView(player)
     root.add(player_view)
 
-    let pets:Pet[] = []
-    for(let i=0;i<1; i++) {
-        let pet = new Pet()
-        pet.bounds.x = randi(0,200)
-        pet.bounds.y = randi(0,200)
-        pet.color = 'yellow'
-        pets.push(pet)
-    }
-    let pet_view = new PetView(pets)
+    let pet_view = new PetView(state)
     root.add(pet_view)
 
-    let coins:Coins[] = []
-    for(let i=0; i<5; i++) {
-        let coin = new Coins(randi(10,100))
-        coin.bounds.x = randi(0,400)
-        coin.bounds.y = randi(0,400)
-        coins.push(coin)
-    }
-
-    let click_view = new ClickView(board,pets,coins)
+    let click_view = new ClickView(state)
     root.add(click_view)
 
     surface.addToPage();
@@ -341,19 +309,14 @@ export function start() {
         if(kbd.is_down('ArrowUp'))    off.y = -1
         if(kbd.is_down('ArrowDown'))  off.y = +1
 
-        let pos = new Point(player.bounds.x, player.bounds.y)
-        let new_pos = pos.add(off.scale(5))
-        let new_cell = new_pos.divide_floor(TS)
-        let spot = board.get_at(new_cell)
-        if(spot === GROUND) {
-            player.bounds.x = new_pos.x
-            player.bounds.y = new_pos.y
-        }
-        if(spot === WALL) {
-            //hit a wall
-        }
+        let bounds = new Rect(player.bounds.x,player.bounds.y,player.bounds.w, player.bounds.h)
+        bounds.add_position(off.scale(5))
 
-        pets.forEach((pet:Pet) => {
+        let hit = state.walls.find(wall =>wall.intersects(bounds))
+        let inside = state.edge.contains_rect(bounds)
+        if(!hit && inside) player.bounds = bounds
+
+        state.pets.forEach((pet:Pet) => {
             if(pet.target === null) {
                 if(player.bounds.intersects(pet.bounds)) {
                     pet.state = 'sitting'
