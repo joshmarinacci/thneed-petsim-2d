@@ -45,28 +45,22 @@ score view shows
  */
 
 import {
+    ActionButton,
+    BaseParentView,
     BaseView,
-    CanvasSurface,
-    CoolEvent,
-    LayerView, log,
-    Point,
+    CanvasSurface, COMMAND_ACTION,
+    CoolEvent, DebugLayer, Header, LayerView, Point,
     POINTER_DOWN, PointerEvent,
     randi,
     Rect,
     Size,
     SurfaceContext
 } from "thneed-gfx";
-import {GridModel, KeyboardMonitor} from "./util";
+import {KeyboardMonitor} from "./util";
 
 
-/*
-- [ ] Pet. Name. Kind. Gold rainbow dark level. Eat per second
-- [ ] Coins. Rainbows.
-- [ ] Tilemap but position anywhere as long as not colliding
-- [ ] Click to target pets
-- [ ] Egg spot to hatch new pets
- */
 
+// @ts-ignore
 Rect.prototype.contains_rect = function(rect:Rect):boolean {
     if(!this.contains(new Point(rect.x,rect.y))) return false
     if(!this.contains(new Point(rect.x,rect.y+rect.h))) return false
@@ -141,10 +135,10 @@ type GameState = {
     walls:Rect[],
     pets:Pet[],
     eggs:Egg[],
+    coin_count:number
 }
 
 class BoardView extends BaseView {
-    private board: GridModel;
     private state: GameState;
 
     constructor(state:GameState) {
@@ -249,6 +243,74 @@ class ClickView extends BaseView {
 
 }
 
+class EggStoreView extends BaseParentView {
+    private state: GameState;
+    constructor(state: GameState) {
+        super("egg-store-view");
+        this.state = state
+
+        let header = new Header()
+        header.set_caption("Egg Store")
+        this.add(header)
+
+        let buy = new ActionButton()
+        buy.set_caption("buy")
+        buy.on(COMMAND_ACTION,() => {
+            this.state.coin_count -= 100
+            let pet = new Pet()
+            pet.kind = 'dog'
+            pet.color = 'brown'
+            this.state.pets.push(pet)
+            this.set_visible(false)
+        })
+        this.add(buy)
+    }
+    draw(g: SurfaceContext): void {
+        g.fillBackgroundSize(this.size(),'#ccffee')
+    }
+
+    layout(g: SurfaceContext, available: Size): Size {
+        this.set_size(new Size(400,300))
+        this.get_children().forEach(ch => ch.layout(g, this.size()))
+        return this.size()
+    }
+
+    set_visible(b: boolean) {
+        this._visible = b
+    }
+}
+
+class ScoreOverlay extends LayerView {
+    private state: GameState;
+    constructor(state: GameState) {
+        super("score-overlay");
+        this.state = state
+    }
+
+    override draw(g: CanvasSurface) {
+        g.ctx.save()
+        g.ctx.translate(500,300)
+        g.fill(new Rect(0,0, 100, 100), 'white')
+        g.fillStandardText(`coins: ${this.state.coin_count}`,10,20)
+        g.fillStandardText(`pets: ${this.state.pets.length}`, 10, 40)
+        g.ctx.restore()
+    }
+}
+
+class EggButton extends ActionButton {
+    set_visible(visible:boolean) {
+        this._visible = visible
+    }
+}
+
+
+function make_coin(state:GameState) {
+    let coin = new Coins(randi(10,100))
+    coin.bounds.x = randi(0,400)
+    coin.bounds.y = randi(0,400)
+    state.coins.push(coin)
+}
+
 export function start() {
     let surface = new CanvasSurface(640, 480);
     let root = new LayerView()
@@ -263,7 +325,8 @@ export function start() {
         ],
         pets:[],
         coins:[],
-        eggs:[]
+        eggs:[],
+        coin_count: 0,
     }
 
     for(let i=0;i<1; i++) {
@@ -274,18 +337,15 @@ export function start() {
         state.pets.push(pet)
     }
 
+
     for(let i=0; i<5; i++) {
-        let coin = new Coins(randi(10,100))
-        coin.bounds.x = randi(0,400)
-        coin.bounds.y = randi(0,400)
-        state.coins.push(coin)
+        make_coin(state)
     }
 
     let cat_egg = new Egg()
     cat_egg.kind = 'cat'
     cat_egg.bounds = new Rect(200,200,30,30)
     state.eggs.push(cat_egg)
-
 
 
     let board_view = new BoardView(state)
@@ -302,6 +362,25 @@ export function start() {
 
     let click_view = new ClickView(state)
     root.add(click_view)
+
+    let egg_button = new EggButton()
+    egg_button.set_caption("buy egg")
+    egg_button.set_visible(false)
+    root.add(egg_button)
+
+    let egg_view = new EggStoreView(state)
+    egg_view.set_position(new Point(100,50))
+    egg_view.set_visible(false)
+    root.add(egg_view)
+
+
+    egg_button.on(COMMAND_ACTION,() => {
+        console.log("showing the dialog")
+        egg_view.set_visible(true)
+    })
+
+
+    root.add(new ScoreOverlay(state))
 
     surface.addToPage();
     surface.set_root(root);
@@ -333,13 +412,17 @@ export function start() {
 
         let hit = state.walls.find(wall =>wall.intersects(bounds))
         if(hit) return
+        // @ts-ignore
         let inside = state.edge.contains_rect(bounds)
         if(!inside) return
         player.bounds = bounds
 
         state.eggs.forEach(egg => {
             if(player.bounds.intersects(egg.bounds)) {
-                console.log("over an egg")
+                egg_button.set_visible(true)
+                egg_button.set_position(egg.bounds.center())
+            } else {
+                egg_button.set_visible(false)
             }
         })
     }
@@ -361,6 +444,7 @@ export function start() {
                 if(target.bounds.intersects(pet.bounds)) {
                     pet.state = 'eating'
                     target.count -= pet.eat_speed
+                    state.coin_count += pet.eat_speed
                     if(target.count < 0) {
                         target.alive = false
                         pet.target = null
@@ -374,6 +458,10 @@ export function start() {
             }
         })
     }
+
+    setInterval(() => {
+        make_coin(state)
+    },5*1000)
 
     function update() {
         update_player()
