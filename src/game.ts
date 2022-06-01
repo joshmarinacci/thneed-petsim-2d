@@ -52,12 +52,15 @@ import {
     CoolEvent, DebugLayer, Header, LayerView, Point,
     POINTER_DOWN, PointerEvent,
     randi,
-    Rect,
-    Size,
+    Rect, Sheet,
+    Size, Sprite,
     SurfaceContext
 } from "thneed-gfx";
 import {KeyboardMonitor} from "./util";
+import {AssetsDoc, load_assets_from_json} from "./app-model";
 
+// @ts-ignore
+import assets_data from "./petsim2d.json"
 
 
 // @ts-ignore
@@ -71,7 +74,7 @@ Rect.prototype.contains_rect = function(rect:Rect):boolean {
 
 type PetLevel = "normal" | "gold" | "rainbow" |"darkmatter"
 type PetState = "sitting" | "eating" | "moving"
-const TS = 20
+const TS = 16
 
 
 class Pet {
@@ -84,6 +87,7 @@ class Pet {
     bounds:Rect
     target:any
     state: PetState
+    sprite: Sprite
     constructor() {
         this.name = "bob"
         this.kind = "cat"
@@ -108,11 +112,14 @@ class Egg {
 }
 class Coins {
     alive: boolean;
-    constructor(number: number) {
+    sprite: Sprite;
+
+    constructor(number: number, sprite: Sprite) {
         this.name = "coins"
         this.count = number
         this.bounds = new Rect(0,0,TS,TS)
         this.alive = true
+        this.sprite = sprite
     }
 
     bounds: Rect
@@ -140,18 +147,18 @@ type GameState = {
 
 class BoardView extends BaseView {
     private state: GameState;
+    private egg_sprite: Sprite
 
-    constructor(state:GameState) {
+    constructor(state:GameState, sprite:Sprite) {
         super('board-view')
         this.state = state
+        this.egg_sprite = sprite
     }
 
     draw(g: SurfaceContext): void {
-        g.fill(this.state.edge,'gray')
-        this.state.walls.forEach(wall => {
-            g.fill(wall,'darkgreen')
-        })
-        this.state.eggs.forEach(egg => g.fill(egg.bounds, 'white'))
+        g.fill(this.state.edge,'#320404')
+        this.state.walls.forEach(wall => g.fill(wall,'darkgreen'))
+        this.state.eggs.forEach(egg => draw_sprite(g,egg.bounds.position(), this.egg_sprite))
     }
 
     layout(g: SurfaceContext, available: Size): Size {
@@ -161,14 +168,23 @@ class BoardView extends BaseView {
 
 }
 
+function draw_sprite(g: SurfaceContext, point: Point, sprite: Sprite) {
+    let cs = (g as CanvasSurface);
+    cs.ctx.imageSmoothingEnabled = false
+    cs.draw_sprite(point.x, point.y, sprite, 4)
+}
+
 class PlayerView extends BaseView {
     private player: Player;
-    constructor(player: Player) {
+    private sprite: Sprite;
+
+    constructor(player: Player, sprite: Sprite) {
         super("player");
         this.player = player
+        this.sprite = sprite
     }
     draw(g: SurfaceContext): void {
-        g.fill(this.player.bounds, this.player.color)
+        draw_sprite(g,this.player.bounds.position(), this.sprite)
     }
 
     layout(g: SurfaceContext, available: Size): Size {
@@ -184,20 +200,9 @@ class PetView extends BaseView {
         super("pets");
         this.state = state
     }
-    draw(g: SurfaceContext): void {
+    draw(g: CanvasSurface): void {
         this.state.pets.forEach(pet => {
-            let rect = pet.bounds
-            let color = pet.color
-            if(pet.state === 'eating') {
-                color = '#d20e71'
-            }
-            if(pet.state === 'moving') {
-                color = '#e948fd'
-            }
-            if(pet.state === "sitting") {
-                color = '#bc23c7'
-            }
-            g.fill(rect,color)
+            draw_sprite(g,pet.bounds.position(),pet.sprite)
         })
     }
 
@@ -216,10 +221,14 @@ class ClickView extends BaseView {
         super("click-view");
         this.state = state
     }
-    draw(g: SurfaceContext): void {
+    draw(g: CanvasSurface): void {
         this.state.coins.forEach(coin => {
             if(coin.alive) {
-                g.fill(coin.bounds, '#ffdd35')
+                if(coin.sprite) {
+                    draw_sprite(g, coin.bounds.position(),coin.sprite)
+                } else {
+                    g.fill(coin.bounds, '#ffdd35')
+                }
             }
         })
     }
@@ -232,7 +241,7 @@ class ClickView extends BaseView {
     override input(event: CoolEvent) {
         if(event.type === POINTER_DOWN) {
             let pt = (event as PointerEvent).position
-            let coins = this.state.coins.find(c => c.bounds.contains(pt))
+            let coins = this.state.coins.find(c => c.bounds.contains(pt) && c.alive)
             if(coins) {
                 this.state.pets.forEach((pet:Pet) => {
                     pet.target = coins
@@ -245,9 +254,11 @@ class ClickView extends BaseView {
 
 class EggStoreView extends BaseParentView {
     private state: GameState;
-    constructor(state: GameState) {
+    private assets: AssetsDoc;
+    constructor(state: GameState, assets:AssetsDoc) {
         super("egg-store-view");
         this.state = state
+        this.assets = assets
 
         let header = new Header()
         header.set_caption("Egg Store")
@@ -258,6 +269,7 @@ class EggStoreView extends BaseParentView {
         buy.on(COMMAND_ACTION,() => {
             this.state.coin_count -= 100
             let pet = new Pet()
+            pet.sprite = assets.find_sprite('main','dog')
             pet.kind = 'dog'
             pet.color = 'brown'
             this.state.pets.push(pet)
@@ -304,14 +316,16 @@ class EggButton extends ActionButton {
 }
 
 
-function make_coin(state:GameState) {
-    let coin = new Coins(randi(10,100))
+function make_coin(state:GameState, assets:AssetsDoc) {
+    if(state.coins.length > 10) return
+    let coin = new Coins(randi(10,100), assets.find_sprite('main','coins'))
     coin.bounds.x = randi(0,400)
     coin.bounds.y = randi(0,400)
     state.coins.push(coin)
 }
 
 export function start() {
+    let assets = load_assets_from_json(assets_data)
     let surface = new CanvasSurface(640, 480);
     let root = new LayerView()
 
@@ -334,13 +348,10 @@ export function start() {
         pet.bounds.x = randi(0,200)
         pet.bounds.y = randi(0,200)
         pet.color = 'yellow'
+        pet.sprite = assets.find_sprite('main','cat')
         state.pets.push(pet)
     }
-
-
-    for(let i=0; i<5; i++) {
-        make_coin(state)
-    }
+    for(let i=0; i<5; i++) make_coin(state, assets)
 
     let cat_egg = new Egg()
     cat_egg.kind = 'cat'
@@ -348,13 +359,13 @@ export function start() {
     state.eggs.push(cat_egg)
 
 
-    let board_view = new BoardView(state)
+    let board_view = new BoardView(state, assets.find_sprite('main','egg'))
     root.add(board_view)
 
     let player = new Player()
     player.bounds.x = 50
     player.bounds.y = 100
-    let player_view = new PlayerView(player)
+    let player_view = new PlayerView(player, assets.find_sprite('main','player'))
     root.add(player_view)
 
     let pet_view = new PetView(state)
@@ -368,7 +379,7 @@ export function start() {
     egg_button.set_visible(false)
     root.add(egg_button)
 
-    let egg_view = new EggStoreView(state)
+    let egg_view = new EggStoreView(state, assets)
     egg_view.set_position(new Point(100,50))
     egg_view.set_visible(false)
     root.add(egg_view)
@@ -460,7 +471,7 @@ export function start() {
     }
 
     setInterval(() => {
-        make_coin(state)
+        make_coin(state, assets)
     },5*1000)
 
     function update() {
