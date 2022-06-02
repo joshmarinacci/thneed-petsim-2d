@@ -144,7 +144,7 @@ type GameState = {
     coin_count:number
 }
 
-class BoardView extends BaseView {
+class BoardView extends LayerView {
     private state: GameState;
     private egg_sprite: Sprite
 
@@ -159,15 +159,9 @@ class BoardView extends BaseView {
         this.state.walls.forEach(wall => g.fill(wall,'darkgreen'))
         this.state.eggs.forEach(egg => g.draw_sprite(egg.bounds.position(), this.egg_sprite))
     }
-
-    layout(g: SurfaceContext, available: Size): Size {
-        this.set_size(available)
-        return this.size()
-    }
-
 }
 
-class PlayerView extends BaseView {
+class PlayerView extends LayerView {
     private player: Player;
     private sprite: Sprite;
 
@@ -179,16 +173,10 @@ class PlayerView extends BaseView {
     draw(g: SurfaceContext): void {
         g.draw_sprite(this.player.bounds.position(), this.sprite)
     }
-
-    layout(g: SurfaceContext, available: Size): Size {
-        this.set_size(new Size(10,10))
-        return this.size()
-    }
 }
 
-class PetView extends BaseView {
+class PetView extends LayerView {
     private state: GameState;
-
     constructor(state: GameState) {
         super("pets");
         this.state = state
@@ -198,12 +186,6 @@ class PetView extends BaseView {
             g.draw_sprite(pet.bounds.position(),pet.sprite)
         })
     }
-
-    layout(g: SurfaceContext, available: Size): Size {
-        this.set_size(available)
-        return this.size()
-    }
-
 }
 
 class ClickView extends BaseView {
@@ -274,6 +256,7 @@ class EggStoreView extends BaseParentView {
     }
     draw(g: SurfaceContext): void {
         g.fillBackgroundSize(this.size(),'#ccffee')
+        g.draw_sprite(new Point(50,30),this.assets.find_sprite('main','dog'))
     }
 
     layout(g: SurfaceContext, available: Size): Size {
@@ -293,7 +276,6 @@ class ScoreOverlay extends LayerView {
         super("score-overlay");
         this.state = state
     }
-
     override draw(g: CanvasSurface) {
         g.ctx.save()
         g.ctx.translate(500,300)
