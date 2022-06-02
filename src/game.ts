@@ -234,10 +234,10 @@ class ClickView extends BaseView {
     override input(event: CoolEvent) {
         if(event.type === POINTER_DOWN) {
             let pt = (event as PointerEvent).position
-            let coins = this.state.coins.find(c => c.bounds.contains(pt) && c.alive)
-            if(coins) {
+            let coin = this.state.coins.find(c => c.bounds.contains(pt) && c.alive)
+            if(coin) {
                 this.state.pets.forEach((pet:Pet) => {
-                    pet.target = coins
+                    pet.target = coin
                 })
             }
         }
