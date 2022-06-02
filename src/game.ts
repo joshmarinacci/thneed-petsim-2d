@@ -45,11 +45,11 @@ score view shows
  */
 
 import {
-    ActionButton,
+    ActionButton, AssetsDoc,
     BaseParentView,
     BaseView,
     CanvasSurface, COMMAND_ACTION,
-    CoolEvent, DebugLayer, Header, LayerView, Point,
+    CoolEvent, DebugLayer, Header, LayerView, load_assets_from_json, Point,
     POINTER_DOWN, PointerEvent,
     randi,
     Rect, Sheet,
@@ -57,7 +57,6 @@ import {
     SurfaceContext, VBox
 } from "thneed-gfx";
 import {KeyboardMonitor} from "./util";
-import {AssetsDoc, load_assets_from_json} from "./app-model";
 
 // @ts-ignore
 import assets_data from "./petsim2d.json"
