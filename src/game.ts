@@ -158,7 +158,7 @@ class BoardView extends BaseView {
     draw(g: SurfaceContext): void {
         g.fill(this.state.edge,'#320404')
         this.state.walls.forEach(wall => g.fill(wall,'darkgreen'))
-        this.state.eggs.forEach(egg => draw_sprite(g,egg.bounds.position(), this.egg_sprite))
+        this.state.eggs.forEach(egg => g.draw_sprite(egg.bounds.position(), this.egg_sprite))
     }
 
     layout(g: SurfaceContext, available: Size): Size {
@@ -166,12 +166,6 @@ class BoardView extends BaseView {
         return this.size()
     }
 
-}
-
-function draw_sprite(g: SurfaceContext, point: Point, sprite: Sprite) {
-    let cs = (g as CanvasSurface);
-    cs.ctx.imageSmoothingEnabled = false
-    cs.draw_sprite(point.x, point.y, sprite, 4)
 }
 
 class PlayerView extends BaseView {
@@ -184,7 +178,7 @@ class PlayerView extends BaseView {
         this.sprite = sprite
     }
     draw(g: SurfaceContext): void {
-        draw_sprite(g,this.player.bounds.position(), this.sprite)
+        g.draw_sprite(this.player.bounds.position(), this.sprite)
     }
 
     layout(g: SurfaceContext, available: Size): Size {
@@ -202,7 +196,7 @@ class PetView extends BaseView {
     }
     draw(g: CanvasSurface): void {
         this.state.pets.forEach(pet => {
-            draw_sprite(g,pet.bounds.position(),pet.sprite)
+            g.draw_sprite(pet.bounds.position(),pet.sprite)
         })
     }
 
@@ -225,7 +219,7 @@ class ClickView extends BaseView {
         this.state.coins.forEach(coin => {
             if(coin.alive) {
                 if(coin.sprite) {
-                    draw_sprite(g, coin.bounds.position(),coin.sprite)
+                    g.draw_sprite(coin.bounds.position(),coin.sprite)
                 } else {
                     g.fill(coin.bounds, '#ffdd35')
                 }
@@ -327,6 +321,8 @@ function make_coin(state:GameState, assets:AssetsDoc) {
 export function start() {
     let assets = load_assets_from_json(assets_data)
     let surface = new CanvasSurface(640, 480);
+    surface.set_sprite_scale(4)
+    surface.set_smooth_sprites(false)
     let root = new LayerView()
 
 
