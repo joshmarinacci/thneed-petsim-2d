@@ -54,7 +54,7 @@ import {
     randi,
     Rect, Sheet,
     Size, Sprite,
-    SurfaceContext
+    SurfaceContext, VBox
 } from "thneed-gfx";
 import {KeyboardMonitor} from "./util";
 import {AssetsDoc, load_assets_from_json} from "./app-model";
@@ -194,7 +194,7 @@ class PetView extends BaseView {
         super("pets");
         this.state = state
     }
-    draw(g: CanvasSurface): void {
+    draw(g: SurfaceContext): void {
         this.state.pets.forEach(pet => {
             g.draw_sprite(pet.bounds.position(),pet.sprite)
         })
@@ -215,7 +215,7 @@ class ClickView extends BaseView {
         super("click-view");
         this.state = state
     }
-    draw(g: CanvasSurface): void {
+    draw(g: SurfaceContext): void {
         this.state.coins.forEach(coin => {
             if(coin.alive) {
                 if(coin.sprite) {
@@ -254,9 +254,10 @@ class EggStoreView extends BaseParentView {
         this.state = state
         this.assets = assets
 
+        let box = new VBox()
         let header = new Header()
         header.set_caption("Egg Store")
-        this.add(header)
+        box.add(header)
 
         let buy = new ActionButton()
         buy.set_caption("buy")
@@ -269,7 +270,8 @@ class EggStoreView extends BaseParentView {
             this.state.pets.push(pet)
             this.set_visible(false)
         })
-        this.add(buy)
+        box.add(buy)
+        this.add(box)
     }
     draw(g: SurfaceContext): void {
         g.fillBackgroundSize(this.size(),'#ccffee')
@@ -327,7 +329,7 @@ export function start() {
 
 
     let state:GameState = {
-        edge: new Rect(0,0,600,400),
+        edge: new Rect(0,0,800,500),
         walls: [
             new Rect(-100,-50,200,100),
             new Rect(200,50,50,50),
