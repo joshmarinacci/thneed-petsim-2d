@@ -74,7 +74,7 @@ Rect.prototype.contains_rect = function(rect:Rect):boolean {
 
 type PetLevel = "normal" | "gold" | "rainbow" |"darkmatter"
 type PetState = "sitting" | "eating" | "moving"
-const TS = 16
+const TS = 8*4
 
 
 class Pet {
@@ -107,7 +107,7 @@ class Egg {
     constructor() {
         this.kind = "cat"
         this.level = "normal"
-        this.bounds = new Rect(0,0,10,10)
+        this.bounds = new Rect(0,0,TS, TS)
     }
 }
 class Coins {
@@ -117,7 +117,7 @@ class Coins {
     constructor(number: number, sprite: Sprite) {
         this.name = "coins"
         this.count = number
-        this.bounds = new Rect(0,0,TS,TS)
+        this.bounds = new Rect(0,0,TS, TS)
         this.alive = true
         this.sprite = sprite
     }
@@ -131,7 +131,7 @@ class Player {
     bounds:Rect
     color:string
     constructor() {
-        this.bounds = new Rect(0,0, TS*2, TS*2)
+        this.bounds = new Rect(0,0, TS,TS)
         this.color = 'blue'
     }
 }
