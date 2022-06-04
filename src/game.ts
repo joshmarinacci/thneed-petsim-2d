@@ -62,14 +62,6 @@ import {KeyboardMonitor} from "./util";
 import assets_data from "./petsim2d.json"
 
 
-// @ts-ignore
-Rect.prototype.contains_rect = function(rect:Rect):boolean {
-    if(!this.contains(new Point(rect.x,rect.y))) return false
-    if(!this.contains(new Point(rect.x,rect.y+rect.h))) return false
-    if(!this.contains(new Point(rect.x+rect.w,rect.y))) return false
-    if(!this.contains(new Point(rect.x+rect.w,rect.y+rect.h))) return false
-    return true
-}
 
 type PetLevel = "normal" | "gold" | "rainbow" |"darkmatter"
 type PetState = "sitting" | "eating" | "moving"
@@ -227,7 +219,7 @@ class ClickView extends BaseView {
 
 }
 
-class EggStoreView extends BaseParentView {
+class EggStoreView extends LayerView {
     private state: GameState;
     private assets: AssetsDoc;
     constructor(state: GameState, assets:AssetsDoc) {
@@ -260,14 +252,9 @@ class EggStoreView extends BaseParentView {
     }
 
     layout(g: SurfaceContext, available: Size): Size {
-        this.set_size(new Size(400,300))
-        this.get_children().forEach(ch => ch.layout(g, this.size()))
-        return this.size()
+        return super.layout(g,new Size(400,300))
     }
 
-    set_visible(b: boolean) {
-        this._visible = b
-    }
 }
 
 class ScoreOverlay extends LayerView {
@@ -286,11 +273,6 @@ class ScoreOverlay extends LayerView {
     }
 }
 
-class EggButton extends ActionButton {
-    set_visible(visible:boolean) {
-        this._visible = visible
-    }
-}
 
 
 function make_coin(state:GameState, assets:AssetsDoc) {
@@ -353,7 +335,7 @@ export function start() {
     let click_view = new ClickView(state)
     root.add(click_view)
 
-    let egg_button = new EggButton()
+    let egg_button = new ActionButton()
     egg_button.set_caption("buy egg")
     egg_button.set_visible(false)
     root.add(egg_button)
@@ -364,11 +346,7 @@ export function start() {
     root.add(egg_view)
 
 
-    egg_button.on(COMMAND_ACTION,() => {
-        console.log("showing the dialog")
-        egg_view.set_visible(true)
-    })
-
+    egg_button.on(COMMAND_ACTION,() =>  egg_view.set_visible(true))
 
     root.add(new ScoreOverlay(state))
 
@@ -376,26 +354,15 @@ export function start() {
     surface.set_root(root);
     surface.start()
 
-    function distance(p1:Point, p2:Point):number {
-        let p3 = p1.subtract(p2)
-        return Math.sqrt(p3.x*p3.x + p3.y*p3.y)
-    }
-    function dir(p1:Point, p2:Point):Point {
-        let len = distance(p1,p2)*2
-        let p3 = p1.subtract(p2)
-        p3.x = p3.x/len
-        p3.y = p3.y/len
-        return p3
-    }
     let kbd = new KeyboardMonitor()
     kbd.monitor(surface)
 
     function update_player() {
         let off = new Point(0,0)
-        if(kbd.is_down('ArrowLeft'))  off.x = -1
-        if(kbd.is_down('ArrowRight')) off.x = +1
-        if(kbd.is_down('ArrowUp'))    off.y = -1
-        if(kbd.is_down('ArrowDown'))  off.y = +1
+        if(kbd.is_down('ArrowLeft') || kbd.is_down('KeyA'))  off.x = -1
+        if(kbd.is_down('ArrowRight') || kbd.is_down('KeyD')) off.x = +1
+        if(kbd.is_down('ArrowUp') || kbd.is_down('KeyW'))    off.y = -1
+        if(kbd.is_down('ArrowDown') || kbd.is_down('KeyS'))  off.y = +1
 
         let bounds = new Rect(player.bounds.x,player.bounds.y,player.bounds.w, player.bounds.h)
         bounds.add_position(off.scale(5))
