@@ -68,6 +68,18 @@ type PetState = "sitting" | "eating" | "moving"
 const TS = 8*4
 
 
+Point.prototype.constrain = function(bounds:Rect):Point {
+    let pt = this.clone()
+    if(pt.x < bounds.x) pt.x = bounds.x
+    if(pt.x > bounds.right()) pt.x = bounds.right()
+    if(pt.y < bounds.y) pt.y = bounds.y
+    if(pt.y > bounds.bottom()) pt.y = bounds.bottom()
+    return pt
+}
+Rect.prototype.subtract = function(pt:Point):Rect {
+    return new Rect(this.x - pt.x, this.y - pt.y, this.w, this.h)
+}
+
 class Pet {
     name:string
     kind:string
@@ -133,7 +145,8 @@ type GameState = {
     walls:Rect[],
     pets:Pet[],
     eggs:Egg[],
-    coin_count:number
+    coin_count:number,
+    camera_scroll:Point,
 }
 
 class BoardView extends LayerView {
@@ -146,24 +159,29 @@ class BoardView extends LayerView {
         this.egg_sprite = sprite
     }
 
-    draw(g: SurfaceContext): void {
+    draw(g: CanvasSurface): void {
+        g.ctx.save()
+        g.ctx.translate(this.state.camera_scroll.x, this.state.camera_scroll.y)
         g.fill(this.state.edge,'#320404')
         this.state.walls.forEach(wall => g.fill(wall,'darkgreen'))
         this.state.eggs.forEach(egg => g.draw_sprite(egg.bounds.position(), this.egg_sprite))
+        g.ctx.restore()
     }
 }
 
 class PlayerView extends LayerView {
     private player: Player;
     private sprite: Sprite;
+    private state: GameState;
 
-    constructor(player: Player, sprite: Sprite) {
+    constructor(state: GameState, player: Player, sprite: Sprite) {
         super("player");
         this.player = player
         this.sprite = sprite
+        this.state = state
     }
     draw(g: SurfaceContext): void {
-        g.draw_sprite(this.player.bounds.position(), this.sprite)
+        g.draw_sprite(this.player.bounds.position().add(this.state.camera_scroll), this.sprite)
     }
 }
 
@@ -175,12 +193,12 @@ class PetView extends LayerView {
     }
     draw(g: SurfaceContext): void {
         this.state.pets.forEach(pet => {
-            g.draw_sprite(pet.bounds.position(),pet.sprite)
+            g.draw_sprite(pet.bounds.position().add(this.state.camera_scroll), pet.sprite)
         })
     }
 }
 
-class ClickView extends BaseView {
+class CoinView extends BaseView {
     private state: GameState;
 
 
@@ -191,11 +209,7 @@ class ClickView extends BaseView {
     draw(g: SurfaceContext): void {
         this.state.coins.forEach(coin => {
             if(coin.alive) {
-                if(coin.sprite) {
-                    g.draw_sprite(coin.bounds.position(),coin.sprite)
-                } else {
-                    g.fill(coin.bounds, '#ffdd35')
-                }
+                g.draw_sprite(coin.bounds.position().add(this.state.camera_scroll),coin.sprite)
             }
         })
     }
@@ -208,6 +222,7 @@ class ClickView extends BaseView {
     override input(event: CoolEvent) {
         if(event.type === POINTER_DOWN) {
             let pt = (event as PointerEvent).position
+            pt = pt.subtract(this.state.camera_scroll)
             let coin = this.state.coins.find(c => c.bounds.contains(pt) && c.alive)
             if(coin) {
                 this.state.pets.forEach((pet:Pet) => {
@@ -283,16 +298,17 @@ function make_coin(state:GameState, assets:AssetsDoc) {
     state.coins.push(coin)
 }
 
+const SCREEN_BOUNDS = new Size(640,480)
 export function start() {
     let assets = load_assets_from_json(assets_data)
-    let surface = new CanvasSurface(640, 480);
+    let surface = new CanvasSurface(SCREEN_BOUNDS.w,SCREEN_BOUNDS.h);
     surface.set_sprite_scale(4)
     surface.set_smooth_sprites(false)
     let root = new LayerView()
 
 
     let state:GameState = {
-        edge: new Rect(0,0,800,500),
+        edge: new Rect(-300,-300,1200,800),
         walls: [
             new Rect(-100,-50,200,100),
             new Rect(200,50,50,50),
@@ -302,6 +318,7 @@ export function start() {
         coins:[],
         eggs:[],
         coin_count: 0,
+        camera_scroll: new Point(0,0),
     }
 
     for(let i=0;i<1; i++) {
@@ -326,14 +343,14 @@ export function start() {
     let player = new Player()
     player.bounds.x = 50
     player.bounds.y = 100
-    let player_view = new PlayerView(player, assets.find_sprite('main','player'))
+    let player_view = new PlayerView(state, player, assets.find_sprite('main','player'))
     root.add(player_view)
 
     let pet_view = new PetView(state)
     root.add(pet_view)
 
-    let click_view = new ClickView(state)
-    root.add(click_view)
+    let coin_view = new CoinView(state)
+    root.add(coin_view)
 
     let egg_button = new ActionButton()
     egg_button.set_caption("buy egg")
@@ -374,10 +391,14 @@ export function start() {
         if(!inside) return
         player.bounds = bounds
 
+        //scroll to keep the player in the scroll bounds
+        let scroll_bounds = new Rect(200,200,SCREEN_BOUNDS.w-200*2,SCREEN_BOUNDS.h-200*2)
+        state.camera_scroll = state.camera_scroll.constrain(scroll_bounds.subtract(player.bounds.position()))
+
         state.eggs.forEach(egg => {
             if(player.bounds.intersects(egg.bounds)) {
                 egg_button.set_visible(true)
-                egg_button.set_position(egg.bounds.center())
+                egg_button.set_position(egg.bounds.center().add(state.camera_scroll))
             } else {
                 egg_button.set_visible(false)
             }
