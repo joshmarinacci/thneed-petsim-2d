@@ -46,14 +46,12 @@ score view shows
 
 import {
     ActionButton, AssetsDoc,
-    BaseParentView,
     BaseView,
     CanvasSurface, COMMAND_ACTION,
-    CoolEvent, DebugLayer, Header, LayerView, load_assets_from_json, Point,
+    CoolEvent, Header, LayerView, load_assets_from_json, Point,
     POINTER_DOWN, PointerEvent,
     randi,
-    Rect, Sheet,
-    Size, Sprite,
+    Rect, Size, Sprite,
     SurfaceContext, VBox
 } from "thneed-gfx";
 import {KeyboardMonitor} from "./util";
@@ -67,18 +65,6 @@ type PetLevel = "normal" | "gold" | "rainbow" |"darkmatter"
 type PetState = "sitting" | "eating" | "moving"
 const TS = 8*4
 
-
-Point.prototype.constrain = function(bounds:Rect):Point {
-    let pt = this.clone()
-    if(pt.x < bounds.x) pt.x = bounds.x
-    if(pt.x > bounds.right()) pt.x = bounds.right()
-    if(pt.y < bounds.y) pt.y = bounds.y
-    if(pt.y > bounds.bottom()) pt.y = bounds.bottom()
-    return pt
-}
-Rect.prototype.subtract = function(pt:Point):Rect {
-    return new Rect(this.x - pt.x, this.y - pt.y, this.w, this.h)
-}
 
 class Pet {
     name:string
